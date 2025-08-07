@@ -1,0 +1,33 @@
+{
+  "include": ["src/**/*"],
+  "compilerOptions": {
+    // add Bun type definitions
+    "types": ["@types/bun"],
+    
+    // enable latest features
+    "lib": ["esnext"],
+    "module": "esnext", 
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    
+    // support JSX
+    "allowJs": true,
+    "esModuleInterop": true,
+    
+    // best practices
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    // Some stricter flags (disabled by default)
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": false
+  }
+}

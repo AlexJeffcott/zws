@@ -1,0 +1,66 @@
+{
+  "name": "@fairfox/zws",
+  "version": "1.0.0",
+  "description": "Zero-width steganography utilities for invisibly embedding data in text using Unicode zero-width characters",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --format esm --target browser && bun run build:types",
+    "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist --skipLibCheck src/index.ts",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
+    "lint": "biome lint src",
+    "lint:fix": "biome lint src --write",
+    "fmt:fix": "biome format src --write",
+    "fmt": "biome format src",
+    "typecheck": "bunx tsc --noEmit",
+    "check": "biome check src",
+    "check:fix": "biome check src --write",
+    "all": "bun run fmt:fix && bun run lint:fix && bun run check:fix && bun run typecheck && bun run test:coverage",
+    "prepublishOnly": "bun run typecheck && bun run check && bun run test && bun run build && bun test-usage.js",
+    "publish:public": "npm publish --access public"
+  },
+  "keywords": [
+    "steganography",
+    "zero-width",
+    "unicode",
+    "invisible",
+    "text",
+    "embedding",
+    "data-hiding",
+    "security",
+    "translation",
+    "internationalization",
+    "i18n"
+  ],
+  "author": "Alex Jeffcott",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexjeffcott/zws"
+  },
+  "bugs": {
+    "url": "https://github.com/alexjeffcott/zws/issues"
+  },
+  "homepage": "https://github.com/alexjeffcott/zws#readme",
+  "devDependencies": {
+    "@biomejs/biome": "^1.8.0",
+    "@types/bun": "^1.2.19"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zero-Width Steganography Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+            background: #f8f9fa;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+        .header {
+            padding: 15px 20px 0 20px;
+            flex-shrink: 0;
+        }
+        .header h1 {
+            font-size: 20px;
+            margin: 0 0 8px 0;
+        }
+        .header p {
+            font-size: 14px;
+            margin: 0 0 10px 0;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            padding: 10px 20px 20px 20px;
+            height: 100%;
+            overflow: hidden;
+        }
+        .panel {
+            background: #f8f9fa;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .panel-header {
+            padding: 15px 15px 10px 15px;
+            flex-shrink: 0;
+        }
+        .panel-header h2 {
+            font-size: 16px;
+            margin: 0 0 8px 0;
+        }
+        .panel-header p {
+            font-size: 12px;
+            margin: 0;
+        }
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 15px 15px 15px;
+        }
+        .translation-form {
+            background: white;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            margin: 0;
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        .translation-form h3 {
+            font-size: 16px;
+            margin: 0 0 8px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #495057;
+            font-size: 13px;
+        }
+        input[type="email"],
+        input[type="text"],
+        input[type="password"],
+        input[type="tel"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            margin: 10px 0;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+            margin-top: 2px;
+        }
+        
+        .checkbox-group label {
+            margin: 0;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+        
+        .upload-area:hover {
+            border-color: #6c757d;
+        }
+        button {
+            background: white;
+            color: black;
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: #f8f9fa;
+            border-color: #6c757d;
+        }
+        .translation-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .translation-item {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .translation-item:hover {
+            background: #e9ecef;
+            border-color: #6c757d;
+        }
+        .translation-item.active {
+            background: #f8f9fa;
+            border-color: #6c757d;
+        }
+        .translation-id {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #6c757d;
+            margin-bottom: 2px;
+        }
+        .translation-text {
+            font-size: 12px;
+            color: #495057;
+        }
+        .highlighted-element {
+            outline: 2px solid hotpink !important;
+            outline-offset: 2px !important;
+        }
+        .avatar-image {
+            border-radius: 25px;
+            margin-bottom: 8px;
+            width: 50px;
+            height: 50px;
+        }
+        .help-text {
+            font-size: 11px;
+            color: #6c757d;
+            margin-top: 3px;
+        }
+        .success-message {
+            margin-top: 10px;
+            padding: 8px;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script type="module">
+        import { html, render, signal } from "https://esm.sh/@fairfox/standalone-web@1.0.3";
+        import { embed, extract, hasEmbeddedData, getCleanText } from 'https://esm.sh/@fairfox/zws';
+
+        const activeTranslation = signal(null);
+        const foundTranslations = signal([]);
+        const selectedElement = signal(null);
+        const elementTranslations = signal([]);
+        
+        const translations = {
+            "form.title": "User Registration",
+            "form.description": "Create your account to get started",
+            "input.firstname.label": "First Name",
+            "input.firstname.placeholder": "Enter your first name",
+            "input.firstname.help": "Your first name as it appears on official documents",
+            "input.lastname.label": "Last Name", 
+            "input.lastname.placeholder": "Enter your last name",
+            "input.lastname.help": "Your family name or surname",
+            "input.email.label": "Email Address",
+            "input.email.placeholder": "Enter your email address",
+            "input.email.help": "We'll never share your email with anyone else",
+            "input.password.label": "Password",
+            "input.password.placeholder": "Create a secure password",
+            "input.password.help": "Must be at least 8 characters long",
+            "input.confirm.label": "Confirm Password",
+            "input.confirm.placeholder": "Re-enter your password",
+            "input.confirm.help": "Must match the password above",
+            "input.phone.label": "Phone Number",
+            "input.phone.placeholder": "Enter your phone number",
+            "input.phone.help": "Optional - for account security notifications",
+            "select.country.label": "Country",
+            "select.country.placeholder": "Select your country",
+            "select.country.help": "Used for regional settings and compliance",
+            "checkbox.terms.label": "I agree to the Terms of Service",
+            "checkbox.newsletter.label": "Subscribe to our newsletter",
+            "img.avatar.alt": "Upload profile photo",
+            "button.upload.text": "Upload Photo",
+            "button.upload.aria": "Upload profile photo",
+            "button.save": "Create Account 🚀",
+            "button.save.aria": "Submit registration form to create your account"
+        };
+
+
+        function t(id) {
+            const text = translations[id] || id;
+            return embed(text, id);
+        }
+
+        function scanForEmbeddedTranslations() {
+            // Clear element-specific translations when scanning all
+            elementTranslations.value = [];
+            selectedElement.value = null;
+            
+            // Clear any existing highlights
+            document.querySelectorAll('.highlighted-element').forEach(el => {
+                el.classList.remove('highlighted-element');
+            });
+            
+            const found = [];
+            const allElements = document.querySelectorAll('*');
+            
+            for (const element of allElements) {
+                // Check textContent (but only for leaf elements to avoid duplicates)
+                if (element.children.length === 0 && element.textContent && hasEmbeddedData(element.textContent)) {
+                    try {
+                        const extractedId = extract(element.textContent);
+                        if (extractedId && translations[extractedId] && !found.some(f => f.id === extractedId)) {
+                            found.push({
+                                id: extractedId,
+                                text: translations[extractedId],
+                                element: element,
+                                property: 'textContent'
+                            });
+                        }
+                    } catch (e) {
+                        // Skip if extraction fails
+                    }
+                }
+                
+                // Check common attributes that might contain embedded text
+                const attributesToCheck = ['placeholder', 'title', 'alt', 'aria-label'];
+                for (const attr of attributesToCheck) {
+                    const attrValue = element.getAttribute(attr);
+                    if (attrValue && hasEmbeddedData(attrValue)) {
+                        try {
+                            const extractedId = extract(attrValue);
+                            if (extractedId && translations[extractedId] && !found.some(f => f.id === extractedId)) {
+                                found.push({
+                                    id: extractedId,
+                                    text: translations[extractedId],
+                                    element: element,
+                                    property: attr
+                                });
+                            }
+                        } catch (e) {
+                            // Skip if extraction fails
+                        }
+                    }
+                }
+            }
+            
+            // Sort by translation ID for consistent display
+            found.sort((a, b) => a.id.localeCompare(b.id));
+            foundTranslations.value = found;
+        }
+
+        function handleElementInspectClick(element, event) {
+            // Only trigger on Shift+Click
+            if (!event.shiftKey) return;
+            
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Clear any existing highlights
+            document.querySelectorAll('.highlighted-element').forEach(el => {
+                el.classList.remove('highlighted-element');
+            });
+            
+            // Highlight clicked element
+            element.classList.add('highlighted-element');
+            selectedElement.value = element;
+            
+            // Find all translations embedded in this element
+            const found = [];
+            
+            // Check textContent
+            if (element.textContent && hasEmbeddedData(element.textContent)) {
+                try {
+                    const extractedId = extract(element.textContent);
+                    if (extractedId && translations[extractedId]) {
+                        found.push({
+                            id: extractedId,
+                            text: translations[extractedId],
+                            property: 'textContent',
+                            value: element.textContent
+                        });
+                    }
+                } catch (e) {
+                    // Skip if extraction fails
+                }
+            }
+            
+            // Check attributes
+            const attributesToCheck = ['placeholder', 'title', 'alt', 'aria-label'];
+            for (const attr of attributesToCheck) {
+                const attrValue = element.getAttribute(attr);
+                if (attrValue && hasEmbeddedData(attrValue)) {
+                    try {
+                        const extractedId = extract(attrValue);
+                        if (extractedId && translations[extractedId]) {
+                            found.push({
+                                id: extractedId,
+                                text: translations[extractedId],
+                                property: attr,
+                                value: attrValue
+                            });
+                        }
+                    } catch (e) {
+                        // Skip if extraction fails
+                    }
+                }
+            }
+            
+            elementTranslations.value = found;
+        }
+
+        // Add global click handler to form elements
+        function setupInspectHandlers() {
+            setTimeout(() => {
+                const formElements = document.querySelectorAll('.translation-form *');
+                formElements.forEach(element => {
+                    element.addEventListener('click', (e) => handleElementInspectClick(element, e));
+                });
+            }, 100);
+        }
+
+
+        function highlightElement(translationId) {
+            // Clear previous highlights
+            document.querySelectorAll('.highlighted-element').forEach(el => {
+                el.classList.remove('highlighted-element');
+            });
+
+            // Find element by scanning for embedded translation ID
+            const allElements = document.querySelectorAll('*');
+            for (const element of allElements) {
+                // Check textContent (but only for leaf elements to avoid duplicates)
+                if (element.children.length === 0 && element.textContent && hasEmbeddedData(element.textContent)) {
+                    try {
+                        const extractedId = extract(element.textContent);
+                        if (extractedId === translationId) {
+                            element.classList.add('highlighted-element');
+                            activeTranslation.value = translationId;
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            return;
+                        }
+                    } catch (e) {
+                        // Skip if extraction fails
+                    }
+                }
+                
+                // Check common attributes that might contain embedded text
+                const attributesToCheck = ['placeholder', 'title', 'alt', 'aria-label'];
+                for (const attr of attributesToCheck) {
+                    const attrValue = element.getAttribute(attr);
+                    if (attrValue && hasEmbeddedData(attrValue)) {
+                        try {
+                            const extractedId = extract(attrValue);
+                            if (extractedId === translationId) {
+                                element.classList.add('highlighted-element');
+                                activeTranslation.value = translationId;
+                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                return;
+                            }
+                        } catch (e) {
+                            // Skip if extraction fails
+                        }
+                    }
+                }
+            }
+        }
+
+        function App() {
+            // Setup inspect handlers after DOM is ready
+            setupInspectHandlers();
+            
+            return html`
+                <div class="container">
+                    <div class="header">
+                        <h1>Zero-Width Steganography Translation Demo</h1>
+                        <p>This example shows how <strong>@fairfox/zws</strong> enables invisible translation IDs embedded directly in text - even in HTML attributes where data-* attributes can't be used.</p>
+                    </div>
+
+                    <div class="layout">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <h2>Sample Form</h2>
+                                <p>This form demonstrates text with embedded translation IDs:</p>
+                            </div>
+                            <div class="panel-content">
+                                <div class="translation-form">
+                                <h3>${t('form.title')}</h3>
+                                <p class="help-text">${t('form.description')}</p>
+                                
+                                <div class="form-group">
+                                    <div class="upload-area">
+                                        <img 
+                                            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Crect width='60' height='60' fill='%23e9ecef' rx='30'/%3E%3Ctext x='30' y='38' text-anchor='middle' font-size='24'%3E👤%3C/text%3E%3C/svg%3E"
+                                            alt="${t('img.avatar.alt')}"
+                                            class="avatar-image"
+                                        />
+                                        <button type="button" aria-label="${t('button.upload.aria')}">
+                                            ${t('button.upload.text')}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="firstname">${t('input.firstname.label')}</label>
+                                        <input 
+                                            type="text"
+                                            id="firstname"
+                                            name="firstname"
+                                            placeholder="${t('input.firstname.placeholder')}"
+                                            aria-describedby="firstname-help"
+                                            required
+                                        />
+                                        <div class="help-text" id="firstname-help">
+                                            ${t('input.firstname.help')}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="lastname">${t('input.lastname.label')}</label>
+                                        <input 
+                                            type="text"
+                                            id="lastname"
+                                            name="lastname"
+                                            placeholder="${t('input.lastname.placeholder')}"
+                                            aria-describedby="lastname-help"
+                                            required
+                                        />
+                                        <div class="help-text" id="lastname-help">
+                                            ${t('input.lastname.help')}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="email">${t('input.email.label')}</label>
+                                    <input 
+                                        type="email"
+                                        id="email"
+                                        name="email"
+                                        placeholder="${t('input.email.placeholder')}"
+                                        aria-describedby="email-help"
+                                        required
+                                    />
+                                    <div class="help-text" id="email-help">
+                                        ${t('input.email.help')}
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="password">${t('input.password.label')}</label>
+                                        <input 
+                                            type="password"
+                                            id="password"
+                                            name="password"
+                                            placeholder="${t('input.password.placeholder')}"
+                                            aria-describedby="password-help"
+                                            required
+                                            minlength="8"
+                                        />
+                                        <div class="help-text" id="password-help">
+                                            ${t('input.password.help')}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="confirm">${t('input.confirm.label')}</label>
+                                        <input 
+                                            type="password"
+                                            id="confirm"
+                                            name="confirm"
+                                            placeholder="${t('input.confirm.placeholder')}"
+                                            aria-describedby="confirm-help"
+                                            required
+                                        />
+                                        <div class="help-text" id="confirm-help">
+                                            ${t('input.confirm.help')}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="phone">${t('input.phone.label')}</label>
+                                        <input 
+                                            type="tel"
+                                            id="phone"
+                                            name="phone"
+                                            placeholder="${t('input.phone.placeholder')}"
+                                            aria-describedby="phone-help"
+                                        />
+                                        <div class="help-text" id="phone-help">
+                                            ${t('input.phone.help')}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="country">${t('select.country.label')}</label>
+                                        <select 
+                                            id="country"
+                                            name="country"
+                                            aria-describedby="country-help"
+                                            required
+                                        >
+                                            <option value="">${t('select.country.placeholder')}</option>
+                                            <option value="us">United States</option>
+                                            <option value="ca">Canada</option>
+                                            <option value="uk">United Kingdom</option>
+                                            <option value="de">Germany</option>
+                                            <option value="fr">France</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                        <div class="help-text" id="country-help">
+                                            ${t('select.country.help')}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="terms" name="terms" required />
+                                    <label for="terms">${t('checkbox.terms.label')}</label>
+                                </div>
+
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="newsletter" name="newsletter" />
+                                    <label for="newsletter">${t('checkbox.newsletter.label')}</label>
+                                </div>
+
+                                <button type="submit" aria-label="${t('button.save.aria')}">
+                                    ${t('button.save')}
+                                </button>
+                            </div>
+                            </div>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-header">
+                                <h2>Translation Inspector</h2>
+                                <button onClick=${scanForEmbeddedTranslations} style="margin-bottom: 15px;">
+                                    Scan
+                                </button>
+                                <p>
+                                    ${elementTranslations.value.length > 0 
+                                        ? 'Translations in selected element:' 
+                                        : foundTranslations.value.length > 0 && 'All found translations - click to highlight:'
+                                </p>
+                                <p>Shift+Click any form element to inspect its embedded translations, or scan all elements.</p>
+                            </div>
+                            <div class="panel-content">
+                                ${elementTranslations.value.length > 0 ? html`
+                                    <ul class="translation-list">
+                                        ${elementTranslations.value.map(({ id, text, property }) => html`
+                                            <li class="translation-item">
+                                                <div class="translation-id">${id} (${property})</div>
+                                                <div class="translation-text">${text}</div>
+                                            </li>
+                                        `)}
+                                    </ul>
+                                ` : html`
+                                    <ul class="translation-list">
+                                        ${foundTranslations.value.map(({ id, text }) => html`
+                                            <li 
+                                                class="translation-item ${activeTranslation.value === id ? 'active' : ''}"
+                                                onClick=${() => highlightElement(id)}
+                                            >
+                                                <div class="translation-id">${id}</div>
+                                                <div class="translation-text">${text}</div>
+                                            </li>
+                                        `)}
+                                    </ul>
+                                `}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        render(html`<${App} />`, document.getElementById('app'));
+    </script>
+</body>
+</html>
