@@ -50,7 +50,7 @@ test('encodes very long text efficiently', () => {
 
   expect(encoded).toMatch(/^[\u200B\u200C]+$/)
   expect(encoded.length).toBe(STRINGS.VERY_LONG.length * 16)
-  expect(encoded.length).toBe(800)
+  expect(encoded.length).toBe(1600)
 })
 
 test('encodes text with control characters', () => {

@@ -88,5 +88,5 @@ export const STRINGS = {
   MIXED_SCRIPTS: 'Hello世界⚕', // Latin + Chinese + Medical symbol (all BMP)
   ONLY_WHITESPACE: '   \t\n  ', // Various whitespace chars
   EMPTY: '',
-  VERY_LONG: 'A'.repeat(50), // Long string within bounds (updated to 50 char limit)
+  VERY_LONG: 'A'.repeat(100), // Long string within bounds
 } as const

@@ -220,7 +220,7 @@ Embeds data invisibly into text using zero-width characters.
 
 - **Parameters:**
   - `text` - The visible text to embed data into (any Unicode supported)
-  - `data` - The data to embed (max 50 characters, Basic Multilingual Plane only)
+  - `data` - The data to embed (max 100 characters, Basic Multilingual Plane only)
 - **Returns:** Text with invisibly embedded data, or original text unchanged if embedding fails
 - **Note:** Never throws - logs warnings on error but returns original text
 
@@ -262,7 +262,7 @@ Low-level function to decode zero-width characters back to data.
 - `zws.END_MARKER` - End marker sequence (`'\u200C\u200B'`)
 - `zws.ZERO_BIT` - Zero bit character (`'\u200B'`)
 - `zws.ONE_BIT` - One bit character (`'\u200C'`)
-- `zws.MAX_DATA_LENGTH` - Maximum data length (50)
+- `zws.MAX_DATA_LENGTH` - Maximum data length (100)
 - `zws.MAX_ENCODED_LENGTH` - Maximum encoded length (800)
 
 ## Security Features
@@ -300,7 +300,7 @@ The test suite verifies handling of:
 
 ## Limitations
 
-- **Embedded data size**: Maximum 50 characters per embedded data
+- **Embedded data size**: Maximum 100 characters per embedded data
 - **Embedded data character set**: Limited to Unicode Basic Multilingual Plane (no emojis)
 - **Visibility**: While invisible to users, data can be detected programmatically
 - **Browser support**: Requires modern browsers with Unicode support

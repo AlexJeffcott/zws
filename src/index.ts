@@ -12,7 +12,7 @@ const START_MARKER = '\u200B\u200C'
 const END_MARKER = '\u200C\u200B'
 const ZERO_BIT = '\u200B'
 const ONE_BIT = '\u200C'
-const MAX_DATA_LENGTH = 50
+const MAX_DATA_LENGTH = 100
 const MAX_ENCODED_LENGTH = MAX_DATA_LENGTH * 16
 
 function hasEmbeddedData(text: string): boolean {

@@ -37,7 +37,7 @@ test('handles very long text with embedded data', () => {
   const cleaned = zws.getCleanText(textWithData)
 
   expect(cleaned).toBe(STRINGS.VERY_LONG)
-  expect(cleaned.length).toBe(50)
+  expect(cleaned.length).toBe(100)
 })
 
 test('handles whitespace-only text with embedded data', () => {

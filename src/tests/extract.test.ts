@@ -37,7 +37,7 @@ test('handles decoding errors gracefully', () => {
 
   // Create text with valid markers but corrupted encoded data that would cause decodeData to fail
   // This uses an extremely long encoded sequence that exceeds MAX_ENCODED_LENGTH in decodeData
-  const longEncodedData = '\u200B'.repeat(801) // Exceeds 50 * 16 = 800 character limit
+  const longEncodedData = '\u200B'.repeat(1601) // Exceeds 100 * 16 = 1600 character limit
   const corruptedText = `Hello\u200B\u200C${longEncodedData}\u200C\u200B world`
 
   expect(zws.extract(corruptedText)).toBe('')
