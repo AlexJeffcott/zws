@@ -47,20 +47,20 @@ bun add @fairfox/zws
 ### Basic Usage
 
 ```typescript
-import { embed, extract, hasEmbeddedData, getCleanText } from '@fairfox/zws';
+import zws from '@fairfox/zws';
 
 // Embed data invisibly in text
-const textWithData = embed('Hello world!', 'secret-id-123');
+const textWithData = zws.embed('Hello world!', 'secret-id-123');
 console.log(textWithData); // Looks like: "Hello world!" (but contains hidden data)
 
 // Check if text has embedded data
-console.log(hasEmbeddedData(textWithData)); // true
+console.log(zws.hasEmbeddedData(textWithData)); // true
 
 // Extract hidden data
-console.log(extract(textWithData)); // "secret-id-123"
+console.log(zws.extract(textWithData)); // "secret-id-123"
 
 // Get clean text without embedded data
-console.log(getCleanText(textWithData)); // "Hello world!"
+console.log(zws.getCleanText(textWithData)); // "Hello world!"
 ```
 
 ### Browser Usage (ESM)
@@ -74,10 +74,10 @@ console.log(getCleanText(textWithData)); // "Hello world!"
 <body>
     <script type="module">
         // Via esm.sh CDN
-        import { embed, extract } from 'https://esm.sh/@fairfox/zws';
+        import zws from 'https://esm.sh/@fairfox/zws';
         
-        const textWithData = embed('Medical instruction', 'instruction-id-456');
-        console.log('Has hidden data:', extract(textWithData));
+        const textWithData = zws.embed('Medical instruction', 'instruction-id-456');
+        console.log('Has hidden data:', zws.extract(textWithData));
     </script>
 </body>
 </html>
@@ -88,7 +88,7 @@ console.log(getCleanText(textWithData)); // "Hello world!"
 The key advantage: embedding translation IDs where HTML data attributes can't be used.
 
 ```typescript
-import { embed, extract } from '@fairfox/zws';
+import zws from '@fairfox/zws';
 
 // Translation data (display text can contain emojis, IDs cannot)
 const translations = {
@@ -110,9 +110,9 @@ function translate(id: string): string {
 function t(id: string): string {
   const text = translate(id);
   
-  // embed() never throws - returns original text on error with warning
+  // zws.embed() never throws - returns original text on error with warning
   if (process.env.NODE_ENV !== 'production') {
-    return embed(text, id);
+    return zws.embed(text, id);
   }
   
   return text;
@@ -206,23 +206,25 @@ function CleanComponentForm() {
 }
 
 // Translation tools can extract IDs from any text, anywhere
-console.log(extract(t('button.save'))); // "button.save"
-console.log(extract(t('img.avatar.alt'))); // "img.avatar.alt"
+console.log(zws.extract(t('button.save'))); // "button.save"
+console.log(zws.extract(t('img.avatar.alt'))); // "img.avatar.alt"
 ```
 
 ## API Reference
 
-### `embed(text: string, data: string): string`
+The library exports a single default object `zws` with all methods and constants:
+
+### `zws.embed(text: string, data: string): string`
 
 Embeds data invisibly into text using zero-width characters.
 
 - **Parameters:**
   - `text` - The visible text to embed data into (any Unicode supported)
-  - `data` - The data to embed (max 100 characters, Basic Multilingual Plane only)
+  - `data` - The data to embed (max 50 characters, Basic Multilingual Plane only)
 - **Returns:** Text with invisibly embedded data, or original text unchanged if embedding fails
 - **Note:** Never throws - logs warnings on error but returns original text
 
-### `extract(text: string): string`
+### `zws.extract(text: string): string`
 
 Extracts embedded data from text.
 
@@ -230,7 +232,7 @@ Extracts embedded data from text.
   - `text` - Text that may contain embedded data
 - **Returns:** The extracted data, or empty string `''` if no data is embedded
 
-### `hasEmbeddedData(text: string): boolean`
+### `zws.hasEmbeddedData(text: string): boolean`
 
 Checks if text contains embedded data.
 
@@ -238,7 +240,7 @@ Checks if text contains embedded data.
   - `text` - Text to check
 - **Returns:** `true` if embedded data is present
 
-### `getCleanText(text: string): string`
+### `zws.getCleanText(text: string): string`
 
 Removes all embedded data from text, returning clean visible text.
 
@@ -246,13 +248,22 @@ Removes all embedded data from text, returning clean visible text.
   - `text` - Text to clean
 - **Returns:** Text with embedded data removed
 
-### `encodeData(data: string): string`
+### `zws.encodeData(data: string): string`
 
 Low-level function to encode data as zero-width characters.
 
-### `decodeData(encodedBinary: string): string`
+### `zws.decodeData(encodedBinary: string): string`
 
 Low-level function to decode zero-width characters back to data.
+
+### Constants
+
+- `zws.START_MARKER` - Start marker sequence (`'\u200B\u200C'`)
+- `zws.END_MARKER` - End marker sequence (`'\u200C\u200B'`)
+- `zws.ZERO_BIT` - Zero bit character (`'\u200B'`)
+- `zws.ONE_BIT` - One bit character (`'\u200C'`)
+- `zws.MAX_DATA_LENGTH` - Maximum data length (50)
+- `zws.MAX_ENCODED_LENGTH` - Maximum encoded length (800)
 
 ## Security Features
 
@@ -289,7 +300,7 @@ The test suite verifies handling of:
 
 ## Limitations
 
-- **Embedded data size**: Maximum 100 characters per embedded data
+- **Embedded data size**: Maximum 50 characters per embedded data
 - **Embedded data character set**: Limited to Unicode Basic Multilingual Plane (no emojis)
 - **Visibility**: While invisible to users, data can be detected programmatically
 - **Browser support**: Requires modern browsers with Unicode support

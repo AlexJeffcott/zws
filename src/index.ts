@@ -8,15 +8,19 @@
  *
  */
 
-export function hasEmbeddedData(text: string): boolean {
-  const START_MARKER = '\u200B\u200C' // Zero-width space + non-joiner sequence
+const START_MARKER = '\u200B\u200C'
+const END_MARKER = '\u200C\u200B'
+const ZERO_BIT = '\u200B'
+const ONE_BIT = '\u200C'
+const MAX_DATA_LENGTH = 50
+const MAX_ENCODED_LENGTH = MAX_DATA_LENGTH * 16
+
+function hasEmbeddedData(text: string): boolean {
   if (typeof text !== 'string') return false
   return text.includes(START_MARKER)
 }
 
-export function embed(text: string, data: string): string {
-  const START_MARKER = '\u200B\u200C' // Zero-width space + non-joiner sequence
-  const END_MARKER = '\u200C\u200B' // Zero-width non-joiner + space sequence (reverse)
+function embed(text: string, data: string): string {
   const normalizedText = typeof text !== 'string' ? String(text || '') : text
   const normalizedData = typeof data !== 'string' ? String(data || '') : data
 
@@ -49,11 +53,7 @@ export function embed(text: string, data: string): string {
   }
 }
 
-export function extract(text: string): string {
-  const START_MARKER = '\u200B\u200C' // Zero-width space + non-joiner sequence
-  const END_MARKER = '\u200C\u200B' // Zero-width non-joiner + space sequence (reverse)
-  const ZERO_BIT = '\u200B' // Zero-width space represents binary '0'
-  const ONE_BIT = '\u200C' // Zero-width non-joiner represents binary '1'
+function extract(text: string): string {
   if (typeof text !== 'string') return ''
   if (!hasEmbeddedData(text)) {
     return ''
@@ -76,11 +76,7 @@ export function extract(text: string): string {
   }
 }
 
-export function getCleanText(text: string): string {
-  const START_MARKER = '\u200B\u200C' // Zero-width space + non-joiner sequence
-  const END_MARKER = '\u200C\u200B' // Zero-width non-joiner + space sequence (reverse)
-  const ZERO_BIT = '\u200B' // Zero-width space represents binary '0'
-  const ONE_BIT = '\u200C' // Zero-width non-joiner represents binary '1'
+function getCleanText(text: string): string {
   if (typeof text !== 'string') return String(text || '')
   return text.replace(
     new RegExp(`${START_MARKER}[${ZERO_BIT}${ONE_BIT}]*${END_MARKER}`, 'g'),
@@ -88,12 +84,9 @@ export function getCleanText(text: string): string {
   )
 }
 
-export function encodeData(data: string): string {
-  const ZERO_BIT = '\u200B' // Zero-width space represents binary '0'
-  const ONE_BIT = '\u200C' // Zero-width non-joiner represents binary '1'
+function encodeData(data: string): string {
   // Bounds checking: Prevent memory exhaustion attacks
   // Translation IDs should be reasonably short
-  const MAX_DATA_LENGTH = 50
   if (data.length > MAX_DATA_LENGTH) {
     throw new Error(
       `Data too long: ${data.length} characters. Maximum allowed: ${MAX_DATA_LENGTH} characters.`,
@@ -122,11 +115,8 @@ export function encodeData(data: string): string {
     .join('')
 }
 
-export function decodeData(encodedBinary: string): string {
-  const ZERO_BIT = '\u200B' // Zero-width space represents binary '0'
-  const ONE_BIT = '\u200C' // Zero-width non-joiner represents binary '1'
+function decodeData(encodedBinary: string): string {
   // Bounds checking: Prevent memory exhaustion through massive encoded data
-  const MAX_ENCODED_LENGTH = 50 * 16 // 50 chars * 16 bits each
   if (encodedBinary.length > MAX_ENCODED_LENGTH) {
     throw new Error(
       `Encoded data too long: ${encodedBinary.length} characters. Maximum allowed: ${MAX_ENCODED_LENGTH} characters.`,
@@ -152,3 +142,20 @@ export function decodeData(encodedBinary: string): string {
 
   return chars.join('')
 }
+
+const zws = {
+  START_MARKER,
+  END_MARKER,
+  ZERO_BIT,
+  ONE_BIT,
+  MAX_DATA_LENGTH,
+  MAX_ENCODED_LENGTH,
+  hasEmbeddedData,
+  embed,
+  extract,
+  getCleanText,
+  encodeData,
+  decodeData,
+}
+
+export default zws

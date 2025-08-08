@@ -1,32 +1,32 @@
 import { expect, test } from 'bun:test'
-import { embed, extract } from '../index'
+import zws from '../index'
 
 test('extracts embedded data successfully', () => {
-  const textWithData = embed('Hello world', 'secret')
-  expect(extract(textWithData)).toBe('secret')
+  const textWithData = zws.embed('Hello world', 'secret')
+  expect(zws.extract(textWithData)).toBe('secret')
 })
 
 test('returns empty string when no embedded data', () => {
-  expect(extract('Hello world')).toBe('')
+  expect(zws.extract('Hello world')).toBe('')
 })
 
 test('returns empty string for malformed data', () => {
   const malformedText = 'Hello\u200B\u200Cmalformed\u200C\u200B world'
-  expect(extract(malformedText)).toBe('')
+  expect(zws.extract(malformedText)).toBe('')
 })
 
 test('extracts data from text with multiple sentences', () => {
-  const textWithData = embed('First sentence. Second sentence.', 'test')
-  expect(extract(textWithData)).toBe('test')
+  const textWithData = zws.embed('First sentence. Second sentence.', 'test')
+  expect(zws.extract(textWithData)).toBe('test')
 })
 
 test('handles empty embedded data', () => {
-  const textWithData = embed('Hello', '')
-  expect(extract(textWithData)).toBe('')
+  const textWithData = zws.embed('Hello', '')
+  expect(zws.extract(textWithData)).toBe('')
 })
 
 test('returns empty string for empty string', () => {
-  expect(extract('')).toBe('')
+  expect(zws.extract('')).toBe('')
 })
 
 test('handles decoding errors gracefully', () => {
@@ -40,7 +40,7 @@ test('handles decoding errors gracefully', () => {
   const longEncodedData = '\u200B'.repeat(801) // Exceeds 50 * 16 = 800 character limit
   const corruptedText = `Hello\u200B\u200C${longEncodedData}\u200C\u200B world`
 
-  expect(extract(corruptedText)).toBe('')
+  expect(zws.extract(corruptedText)).toBe('')
 
   // Restore original console.warn
   console.warn = originalWarn

@@ -210,8 +210,8 @@
     <div id="app"></div>
 
     <script type="module">
-        import { html, render, signal } from "https://esm.sh/@fairfox/standalone-web@1.0.3";
-        import { embed, extract, hasEmbeddedData, getCleanText } from 'https://esm.sh/@fairfox/zws';
+        import { html, render, signal } from "https://esm.sh/@fairfox/standalone-web";
+        import zws from 'https://esm.sh/@fairfox/zws';
 
         const activeTranslation = signal(null);
         const foundTranslations = signal([]);
@@ -254,15 +254,13 @@
 
         function t(id) {
             const text = translations[id] || id;
-            return embed(text, id);
+            return zws.embed(text, id);
         }
 
         function scanForEmbeddedTranslations() {
-            // Clear element-specific translations when scanning all
             elementTranslations.value = [];
             selectedElement.value = null;
             
-            // Clear any existing highlights
             document.querySelectorAll('.highlighted-element').forEach(el => {
                 el.classList.remove('highlighted-element');
             });
@@ -271,10 +269,9 @@
             const allElements = document.querySelectorAll('*');
             
             for (const element of allElements) {
-                // Check textContent (but only for leaf elements to avoid duplicates)
-                if (element.children.length === 0 && element.textContent && hasEmbeddedData(element.textContent)) {
+                if (element.children.length === 0 && element.textContent && zws.hasEmbeddedData(element.textContent)) {
                     try {
-                        const extractedId = extract(element.textContent);
+                        const extractedId = zws.extract(element.textContent);
                         if (extractedId && translations[extractedId] && !found.some(f => f.id === extractedId)) {
                             found.push({
                                 id: extractedId,
@@ -288,13 +285,12 @@
                     }
                 }
                 
-                // Check common attributes that might contain embedded text
                 const attributesToCheck = ['placeholder', 'title', 'alt', 'aria-label'];
                 for (const attr of attributesToCheck) {
                     const attrValue = element.getAttribute(attr);
-                    if (attrValue && hasEmbeddedData(attrValue)) {
+                    if (attrValue && zws.hasEmbeddedData(attrValue)) {
                         try {
-                            const extractedId = extract(attrValue);
+                            const extractedId = zws.extract(attrValue);
                             if (extractedId && translations[extractedId] && !found.some(f => f.id === extractedId)) {
                                 found.push({
                                     id: extractedId,
@@ -310,7 +306,6 @@
                 }
             }
             
-            // Sort by translation ID for consistent display
             found.sort((a, b) => a.id.localeCompare(b.id));
             foundTranslations.value = found;
         }
@@ -322,22 +317,18 @@
             event.preventDefault();
             event.stopPropagation();
             
-            // Clear any existing highlights
             document.querySelectorAll('.highlighted-element').forEach(el => {
                 el.classList.remove('highlighted-element');
             });
             
-            // Highlight clicked element
             element.classList.add('highlighted-element');
             selectedElement.value = element;
             
-            // Find all translations embedded in this element
             const found = [];
             
-            // Check textContent
-            if (element.textContent && hasEmbeddedData(element.textContent)) {
+            if (element.textContent && zws.hasEmbeddedData(element.textContent)) {
                 try {
-                    const extractedId = extract(element.textContent);
+                    const extractedId = zws.extract(element.textContent);
                     if (extractedId && translations[extractedId]) {
                         found.push({
                             id: extractedId,
@@ -351,13 +342,12 @@
                 }
             }
             
-            // Check attributes
             const attributesToCheck = ['placeholder', 'title', 'alt', 'aria-label'];
             for (const attr of attributesToCheck) {
                 const attrValue = element.getAttribute(attr);
-                if (attrValue && hasEmbeddedData(attrValue)) {
+                if (attrValue && zws.hasEmbeddedData(attrValue)) {
                     try {
-                        const extractedId = extract(attrValue);
+                        const extractedId = zws.extract(attrValue);
                         if (extractedId && translations[extractedId]) {
                             found.push({
                                 id: extractedId,
@@ -375,7 +365,6 @@
             elementTranslations.value = found;
         }
 
-        // Add global click handler to form elements
         function setupInspectHandlers() {
             setTimeout(() => {
                 const formElements = document.querySelectorAll('.translation-form *');
@@ -387,18 +376,15 @@
 
 
         function highlightElement(translationId) {
-            // Clear previous highlights
             document.querySelectorAll('.highlighted-element').forEach(el => {
                 el.classList.remove('highlighted-element');
             });
 
-            // Find element by scanning for embedded translation ID
             const allElements = document.querySelectorAll('*');
             for (const element of allElements) {
-                // Check textContent (but only for leaf elements to avoid duplicates)
-                if (element.children.length === 0 && element.textContent && hasEmbeddedData(element.textContent)) {
+                if (element.children.length === 0 && element.textContent && zws.hasEmbeddedData(element.textContent)) {
                     try {
-                        const extractedId = extract(element.textContent);
+                        const extractedId = zws.extract(element.textContent);
                         if (extractedId === translationId) {
                             element.classList.add('highlighted-element');
                             activeTranslation.value = translationId;
@@ -410,13 +396,12 @@
                     }
                 }
                 
-                // Check common attributes that might contain embedded text
                 const attributesToCheck = ['placeholder', 'title', 'alt', 'aria-label'];
                 for (const attr of attributesToCheck) {
                     const attrValue = element.getAttribute(attr);
-                    if (attrValue && hasEmbeddedData(attrValue)) {
+                    if (attrValue && zws.hasEmbeddedData(attrValue)) {
                         try {
-                            const extractedId = extract(attrValue);
+                            const extractedId = zws.extract(attrValue);
                             if (extractedId === translationId) {
                                 element.classList.add('highlighted-element');
                                 activeTranslation.value = translationId;
@@ -432,7 +417,6 @@
         }
 
         function App() {
-            // Setup inspect handlers after DOM is ready
             setupInspectHandlers();
             
             return html`
