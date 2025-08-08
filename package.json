@@ -1,6 +1,6 @@
 {
   "name": "@fairfox/zws",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Zero-width steganography utilities for invisibly embedding data in text using Unicode zero-width characters",
   "main": "dist/index.js",
   "module": "dist/index.js",
