@@ -8,17 +8,15 @@
  *
  */
 
-const START_MARKER = '\u200B\u200C' // Zero-width space + non-joiner sequence
-const END_MARKER = '\u200C\u200B' // Zero-width non-joiner + space sequence (reverse)
-const ZERO_BIT = '\u200B' // Zero-width space represents binary '0'
-const ONE_BIT = '\u200C' // Zero-width non-joiner represents binary '1'
-
 export function hasEmbeddedData(text: string): boolean {
+  const START_MARKER = '\u200B\u200C' // Zero-width space + non-joiner sequence
   if (typeof text !== 'string') return false
   return text.includes(START_MARKER)
 }
 
 export function embed(text: string, data: string): string {
+  const START_MARKER = '\u200B\u200C' // Zero-width space + non-joiner sequence
+  const END_MARKER = '\u200C\u200B' // Zero-width non-joiner + space sequence (reverse)
   const normalizedText = typeof text !== 'string' ? String(text || '') : text
   const normalizedData = typeof data !== 'string' ? String(data || '') : data
 
@@ -52,6 +50,10 @@ export function embed(text: string, data: string): string {
 }
 
 export function extract(text: string): string {
+  const START_MARKER = '\u200B\u200C' // Zero-width space + non-joiner sequence
+  const END_MARKER = '\u200C\u200B' // Zero-width non-joiner + space sequence (reverse)
+  const ZERO_BIT = '\u200B' // Zero-width space represents binary '0'
+  const ONE_BIT = '\u200C' // Zero-width non-joiner represents binary '1'
   if (typeof text !== 'string') return ''
   if (!hasEmbeddedData(text)) {
     return ''
@@ -75,6 +77,10 @@ export function extract(text: string): string {
 }
 
 export function getCleanText(text: string): string {
+  const START_MARKER = '\u200B\u200C' // Zero-width space + non-joiner sequence
+  const END_MARKER = '\u200C\u200B' // Zero-width non-joiner + space sequence (reverse)
+  const ZERO_BIT = '\u200B' // Zero-width space represents binary '0'
+  const ONE_BIT = '\u200C' // Zero-width non-joiner represents binary '1'
   if (typeof text !== 'string') return String(text || '')
   return text.replace(
     new RegExp(`${START_MARKER}[${ZERO_BIT}${ONE_BIT}]*${END_MARKER}`, 'g'),
@@ -83,6 +89,8 @@ export function getCleanText(text: string): string {
 }
 
 export function encodeData(data: string): string {
+  const ZERO_BIT = '\u200B' // Zero-width space represents binary '0'
+  const ONE_BIT = '\u200C' // Zero-width non-joiner represents binary '1'
   // Bounds checking: Prevent memory exhaustion attacks
   // Translation IDs should be reasonably short
   const MAX_DATA_LENGTH = 50
@@ -115,6 +123,8 @@ export function encodeData(data: string): string {
 }
 
 export function decodeData(encodedBinary: string): string {
+  const ZERO_BIT = '\u200B' // Zero-width space represents binary '0'
+  const ONE_BIT = '\u200C' // Zero-width non-joiner represents binary '1'
   // Bounds checking: Prevent memory exhaustion through massive encoded data
   const MAX_ENCODED_LENGTH = 50 * 16 // 50 chars * 16 bits each
   if (encodedBinary.length > MAX_ENCODED_LENGTH) {
