@@ -48,7 +48,7 @@ test('handles whitespace-only text with embedded data', () => {
 })
 
 test('removes multiple embedded data blocks while preserving legitimate chars', () => {
-  let text = STRINGS.WITH_RTL as any
+  let text: string = STRINGS.WITH_RTL
   text = zws.embed(text, 'data1')
   text = text + STRINGS.WITH_ZWJ
   text = zws.embed(text, 'data2')

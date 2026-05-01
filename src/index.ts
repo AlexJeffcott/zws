@@ -85,16 +85,16 @@ function getCleanText(text: string): string {
 }
 
 function encodeData(data: string): string {
-  // Bounds checking: Prevent memory exhaustion attacks
-  // Translation IDs should be reasonably short
+  // Bounds checking: prevent memory exhaustion via oversized inputs.
+  // 100 chars is a conservative default; the encoded form is 16x larger.
   if (data.length > MAX_DATA_LENGTH) {
     throw new Error(
       `Data too long: ${data.length} characters. Maximum allowed: ${MAX_DATA_LENGTH} characters.`,
     )
   }
 
-  // Validate that data contains only UTF-8 safe characters (Basic Multilingual Plane)
-  // This excludes emojis and complex Unicode that would cause encoding issues
+  // Restrict to Basic Multilingual Plane (U+0000-U+FFFF).
+  // Excludes astral code points (e.g. most emoji) which require surrogate-pair handling.
   for (let i = 0; i < data.length; i++) {
     const codePoint = data.codePointAt(i) || 0
     if (codePoint > 65535) {
