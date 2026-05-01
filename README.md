@@ -20,17 +20,18 @@ Steganography is the practice of concealing information within other non-secret 
 
 Zero-width characters are Unicode characters that have no visual representation but are still part of the text. This library uses:
 
-- `\u200B` (Zero Width Space) - represents binary `0`
-- `\u200C` (Zero Width Non-Joiner) - represents binary `1`
-- `\u200B\u200C` - Start marker sequence
-- `\u200C\u200B` - End marker sequence (reverse)
+- `\u200B` (Zero Width Space) — represents binary `0`
+- `\u200C` (Zero Width Non-Joiner) — represents binary `1`
+- `\u200B\u200C` — start marker sequence (signals the beginning of an embed)
 
 ### Encoding Process
 
-1. Input data is converted to binary (16-bit per character)
-2. Each bit is mapped to a zero-width character (0→`\u200B`, 1→`\u200C`)
-3. The encoded sequence is wrapped with start/end markers
-4. The invisible marker sequence is inserted into the visible text
+1. The input data length (in characters) is encoded as a 16-bit value.
+2. Each input character is encoded as 16 bits.
+3. Each bit becomes a zero-width character (`0` → `\u200B`, `1` → `\u200C`).
+4. The bit sequence is prefixed with the start marker and inserted into the visible text.
+
+The length prefix tells the decoder exactly how many payload bits to consume, so back-to-back embeds — even with empty visible text between them — decode unambiguously.
 
 ## Installation
 
@@ -234,7 +235,7 @@ Embeds `data` invisibly into `text`. Returns the text with the embedded marker a
 extract(text: string): string
 ```
 
-Returns the first embedded payload, or `''` if `text` has no embedded data or the markers do not enclose a valid bit sequence. Throws if a valid marker pair is found but the encoded body exceeds `MAX_ENCODED_LENGTH`.
+Returns the first embedded payload, or `''` if `text` has no embedded data or no well-formed embed candidate is found. Embed candidates with malformed length prefixes, oversized declared lengths, truncated payloads, or non-bit-class characters in the payload region are skipped.
 
 ### `zws.extractAll(text)`
 
@@ -242,7 +243,7 @@ Returns the first embedded payload, or `''` if `text` has no embedded data or th
 extractAll(text: string): string[]
 ```
 
-Returns every embedded payload in document order. Returns `[]` if no embedded data is present. Same throw conditions as `extract` apply per payload.
+Returns every well-formed embedded payload in document order. Returns `[]` if none are present. Malformed candidates are skipped silently, the same as for `extract`.
 
 ### `zws.hasEmbeddedData(text)`
 
@@ -258,7 +259,7 @@ hasEmbeddedData(text: string): boolean
 getCleanText(text: string): string
 ```
 
-Returns `text` with every embedded marker pair removed. Other zero-width characters (ZWJ, RTL marks, etc.) are preserved.
+Returns `text` with every well-formed embed (start marker, length prefix, and payload) removed. Other zero-width characters (ZWJ, RTL marks, etc.) and standalone start markers without valid following bits are preserved.
 
 ### `zws.encodeData(data)` / `zws.decodeData(encodedBinary)`
 
@@ -269,11 +270,10 @@ Low-level encoders. `encodeData` throws on oversized or non-BMP input; `decodeDa
 | Constant | Value |
 |---|---|
 | `zws.START_MARKER` | `'\u200B\u200C'` |
-| `zws.END_MARKER` | `'\u200C\u200B'` |
 | `zws.ZERO_BIT` | `'\u200B'` |
 | `zws.ONE_BIT` | `'\u200C'` |
 | `zws.MAX_DATA_LENGTH` | `100` |
-| `zws.MAX_ENCODED_LENGTH` | `1600` |
+| `zws.MAX_ENCODED_LENGTH` | `1600` (only meaningful when calling `decodeData` directly) |
 
 ## Migration from 1.x
 
@@ -281,7 +281,7 @@ Version 2 cleans up the public contract. Callers upgrading from 1.x should expec
 
 - **`embed` throws on errors.** Previously, oversized data, astral characters, or already-embedded input produced a `console.warn` and returned the original text. The library now throws `Error`. Wrap calls in `try`/`catch`, or pre-validate with `hasEmbeddedData` and length checks.
 - **`embed`'s default insertion point is `'end'`.** Previous versions inserted after the first sentence terminator. To preserve that behaviour, pass `{ position: 'after-first-sentence' }`.
-- **`extract` throws when an embedded payload exceeds `MAX_ENCODED_LENGTH`.** Previously this returned `''` with a warning. Returning `''` is now reserved for the genuinely-no-data case.
+- **Wire format changed.** Embeds are now `start marker + 16-bit length + payload bits`, with no end marker. Text embedded by 1.x cannot be extracted by 2.x and vice versa. The `END_MARKER` constant has been removed from the public namespace.
 - **No input coercion.** Passing non-strings to any function now throws `TypeError`. The TypeScript signatures required `string` already; this aligns runtime with types.
 - **New `extractAll` method.** Use this when a single `text` may carry several embedded payloads.
 
@@ -289,7 +289,6 @@ Version 2 cleans up the public contract. Callers upgrading from 1.x should expec
 
 - Embedded data is capped at 100 characters and must lie within the Basic Multilingual Plane (no astral code points, no emoji).
 - Embedded data is invisible but trivially detectable: this is steganography, not encryption.
-- Concatenating two embeds whose visible portions are both empty (`embed('', x) + embed('', y)`) produces a sequence the extractor can decode but the boundary between payloads is lost. Insert any non-zero-width character between such embeds, or supply non-empty visible text.
 
 ## License
 

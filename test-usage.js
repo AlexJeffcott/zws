@@ -20,7 +20,8 @@ console.log('✅ Clean text successful');
 
 // Position option: opt-in sentence-aware insertion
 const sentenceText = zws.embed('First. Second.', 'id', { position: 'after-first-sentence' });
-assert.match(sentenceText, /^First\.​‌.*‌​ Second\.$/, 'embed should insert after first sentence when opted in');
+assert.match(sentenceText, /^First\.​‌[​‌]+ Second\.$/, 'embed should insert after first sentence when opted in');
+assert.equal(zws.extract(sentenceText), 'id', 'extract should round-trip the position-option embed');
 console.log('✅ Position option successful');
 
 // extractAll: multiple embeds

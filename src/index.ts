@@ -8,9 +8,9 @@
  */
 
 const START_MARKER = '\u200B\u200C'
-const END_MARKER = '\u200C\u200B'
 const ZERO_BIT = '\u200B'
 const ONE_BIT = '\u200C'
+const LENGTH_BITS = 16
 const MAX_DATA_LENGTH = 100
 const MAX_ENCODED_LENGTH = MAX_DATA_LENGTH * 16
 
@@ -18,6 +18,13 @@ export type EmbedPosition = 'end' | 'after-first-sentence'
 
 export type EmbedOptions = {
   position?: EmbedPosition
+}
+
+type EmbedRange = {
+  start: number
+  end: number
+  payloadStart: number
+  payloadLength: number
 }
 
 function hasEmbeddedData(text: string): boolean {
@@ -29,8 +36,9 @@ function embed(text: string, data: string, options: EmbedOptions = {}): string {
     throw new Error('Cannot embed: text already contains embedded data')
   }
 
-  const encoded = encodeData(data)
-  const marker = START_MARKER + encoded + END_MARKER
+  const payload = encodeData(data)
+  const lengthPrefix = bitsForLength(data.length)
+  const marker = START_MARKER + lengthPrefix + payload
 
   if (options.position === 'after-first-sentence') {
     const sentenceEnd = text.search(/[.!?]\s/)
@@ -45,42 +53,38 @@ function embed(text: string, data: string, options: EmbedOptions = {}): string {
 
 function extract(text: string): string {
   if (!hasEmbeddedData(text)) return ''
-
-  const pattern = new RegExp(
-    `${START_MARKER}([${ZERO_BIT}${ONE_BIT}]*)${END_MARKER}`,
+  const ranges = findEmbeds(text)
+  if (ranges.length === 0) return ''
+  const r = ranges[0] as EmbedRange
+  return decodeData(
+    text.substring(r.payloadStart, r.payloadStart + r.payloadLength),
   )
-  const match = text.match(pattern)
-  if (!match) return ''
-
-  return decodeData(match[1] || '')
 }
 
 function extractAll(text: string): string[] {
   if (!hasEmbeddedData(text)) return []
-
-  const pattern = new RegExp(
-    `${START_MARKER}([${ZERO_BIT}${ONE_BIT}]*)${END_MARKER}`,
-    'g',
+  return findEmbeds(text).map((r) =>
+    decodeData(
+      text.substring(r.payloadStart, r.payloadStart + r.payloadLength),
+    ),
   )
-  const out: string[] = []
-  let match: RegExpExecArray | null = pattern.exec(text)
-  while (match !== null) {
-    out.push(decodeData(match[1] || ''))
-    match = pattern.exec(text)
-  }
-  return out
 }
 
 function getCleanText(text: string): string {
-  return text.replace(
-    new RegExp(`${START_MARKER}[${ZERO_BIT}${ONE_BIT}]*${END_MARKER}`, 'g'),
-    '',
-  )
+  if (!hasEmbeddedData(text)) return text
+  const ranges = findEmbeds(text)
+  if (ranges.length === 0) return text
+  let out = ''
+  let cursor = 0
+  for (const r of ranges) {
+    out += text.substring(cursor, r.start)
+    cursor = r.end
+  }
+  out += text.substring(cursor)
+  return out
 }
 
 function encodeData(data: string): string {
-  // Bounds checking: prevent memory exhaustion via oversized inputs.
-  // 100 chars is a conservative default; the encoded form is 16x larger.
   if (data.length > MAX_DATA_LENGTH) {
     throw new Error(
       `Data too long: ${data.length} characters. Maximum allowed: ${MAX_DATA_LENGTH} characters.`,
@@ -133,9 +137,84 @@ function decodeData(encodedBinary: string): string {
   return chars.join('')
 }
 
+function bitsForLength(n: number): string {
+  return n
+    .toString(2)
+    .padStart(LENGTH_BITS, '0')
+    .split('')
+    .map((bit) => (bit === '0' ? ZERO_BIT : ONE_BIT))
+    .join('')
+}
+
+// Scan text for well-formed embed sequences.
+// Each embed is START_MARKER + LENGTH_BITS bits of length + length*16 bits of payload.
+// Candidates with malformed length, oversized length, non-bit payload chars, or truncation
+// are skipped (advance one char past START and keep scanning).
+function findEmbeds(text: string): EmbedRange[] {
+  const ranges: EmbedRange[] = []
+  let i = 0
+  while (i <= text.length - START_MARKER.length) {
+    const startIdx = text.indexOf(START_MARKER, i)
+    if (startIdx === -1) break
+
+    const lengthStart = startIdx + START_MARKER.length
+    const payloadStart = lengthStart + LENGTH_BITS
+
+    if (payloadStart > text.length) {
+      i = startIdx + 1
+      continue
+    }
+
+    let lengthBinary = ''
+    let valid = true
+    for (let k = 0; k < LENGTH_BITS; k++) {
+      const c = text[lengthStart + k]
+      if (c === ZERO_BIT) lengthBinary += '0'
+      else if (c === ONE_BIT) lengthBinary += '1'
+      else {
+        valid = false
+        break
+      }
+    }
+    if (!valid) {
+      i = startIdx + 1
+      continue
+    }
+
+    const dataLength = Number.parseInt(lengthBinary, 2)
+    if (dataLength > MAX_DATA_LENGTH) {
+      i = startIdx + 1
+      continue
+    }
+
+    const payloadLength = dataLength * 16
+    const end = payloadStart + payloadLength
+    if (end > text.length) {
+      i = startIdx + 1
+      continue
+    }
+
+    let payloadValid = true
+    for (let k = 0; k < payloadLength; k++) {
+      const c = text[payloadStart + k]
+      if (c !== ZERO_BIT && c !== ONE_BIT) {
+        payloadValid = false
+        break
+      }
+    }
+    if (!payloadValid) {
+      i = startIdx + 1
+      continue
+    }
+
+    ranges.push({ start: startIdx, end, payloadStart, payloadLength })
+    i = end
+  }
+  return ranges
+}
+
 const zws = {
   START_MARKER,
-  END_MARKER,
   ZERO_BIT,
   ONE_BIT,
   MAX_DATA_LENGTH,

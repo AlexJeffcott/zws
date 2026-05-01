@@ -31,8 +31,9 @@ test('skips malformed marker pairs that do not match the pattern', () => {
   expect(zws.extractAll(valid + ' ' + malformed)).toEqual(['good'])
 })
 
-test('throws when an embedded payload exceeds MAX_ENCODED_LENGTH', () => {
-  const longEncoded = '​'.repeat(zws.MAX_ENCODED_LENGTH + 1)
-  const corrupted = `Hello​‌${longEncoded}‌​ world`
-  expect(() => zws.extractAll(corrupted)).toThrow('Encoded data too long')
+test('returns valid embeds and skips malformed candidates in the same text', () => {
+  const valid = zws.embed('hello', 'good')
+  // Junk preceded by START marker but with payload chars not matching the length prefix.
+  const junk = `​‌${'‌'.repeat(16)}${'​'.repeat(50)}`
+  expect(zws.extractAll(valid + junk)).toEqual(['good'])
 })
