@@ -106,16 +106,18 @@ function translate(id: string): string {
   return translations[id] || id;
 }
 
-// Wrapper that embeds IDs in staging environments
+// Wrapper that embeds IDs in staging environments.
+// embed() throws on invalid input (oversized data, astral characters, or
+// already-embedded text); guard accordingly when wrapping arbitrary content.
 function t(id: string): string {
   const text = translate(id);
-  
-  // zws.embed() never throws - returns original text on error with warning
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV === 'production') return text;
+  if (zws.hasEmbeddedData(text)) return text;
+  try {
     return zws.embed(text, id);
+  } catch {
+    return text;
   }
-  
-  return text;
 }
 
 // ✅ Possible but verbose - requires 100% control over component HTML
@@ -212,98 +214,82 @@ console.log(zws.extract(t('img.avatar.alt'))); // "img.avatar.alt"
 
 ## API Reference
 
-The library exports a single default object `zws` with all methods and constants:
+The library exports a single default object `zws` with all methods and constants. Named type exports `EmbedOptions` and `EmbedPosition` are also available.
 
-### `zws.embed(text: string, data: string): string`
+### `zws.embed(text, data, options?)`
 
-Embeds data invisibly into text using zero-width characters.
+```ts
+embed(text: string, data: string, options?: EmbedOptions): string
+```
 
-- **Parameters:**
-  - `text` - The visible text to embed data into (any Unicode supported)
-  - `data` - The data to embed (max 100 characters, Basic Multilingual Plane only)
-- **Returns:** Text with invisibly embedded data, or original text unchanged if embedding fails
-- **Note:** Never throws - logs warnings on error but returns original text
+Embeds `data` invisibly into `text`. Returns the text with the embedded marker appended.
 
-### `zws.extract(text: string): string`
+- `data` must be at most `MAX_DATA_LENGTH` (100) characters and contain only Basic Multilingual Plane code points.
+- `options.position` (default `'end'`) controls where the marker is inserted: `'end'` appends; `'after-first-sentence'` inserts after the first `[.!?]` followed by whitespace, falling back to `'end'` when none is found.
+- Throws if `text` already contains embedded data, or if `data` violates the length or BMP constraint.
 
-Extracts embedded data from text.
+### `zws.extract(text)`
 
-- **Parameters:**
-  - `text` - Text that may contain embedded data
-- **Returns:** The extracted data, or empty string `''` if no data is embedded
+```ts
+extract(text: string): string
+```
 
-### `zws.hasEmbeddedData(text: string): boolean`
+Returns the first embedded payload, or `''` if `text` has no embedded data or the markers do not enclose a valid bit sequence. Throws if a valid marker pair is found but the encoded body exceeds `MAX_ENCODED_LENGTH`.
 
-Checks if text contains embedded data.
+### `zws.extractAll(text)`
 
-- **Parameters:**
-  - `text` - Text to check
-- **Returns:** `true` if embedded data is present
+```ts
+extractAll(text: string): string[]
+```
 
-### `zws.getCleanText(text: string): string`
+Returns every embedded payload in document order. Returns `[]` if no embedded data is present. Same throw conditions as `extract` apply per payload.
 
-Removes all embedded data from text, returning clean visible text.
+### `zws.hasEmbeddedData(text)`
 
-- **Parameters:**
-  - `text` - Text to clean
-- **Returns:** Text with embedded data removed
+```ts
+hasEmbeddedData(text: string): boolean
+```
 
-### `zws.encodeData(data: string): string`
+`true` if `text` contains the start-marker sequence.
 
-Low-level function to encode data as zero-width characters.
+### `zws.getCleanText(text)`
 
-### `zws.decodeData(encodedBinary: string): string`
+```ts
+getCleanText(text: string): string
+```
 
-Low-level function to decode zero-width characters back to data.
+Returns `text` with every embedded marker pair removed. Other zero-width characters (ZWJ, RTL marks, etc.) are preserved.
+
+### `zws.encodeData(data)` / `zws.decodeData(encodedBinary)`
+
+Low-level encoders. `encodeData` throws on oversized or non-BMP input; `decodeData` throws when given more than `MAX_ENCODED_LENGTH` characters.
 
 ### Constants
 
-- `zws.START_MARKER` - Start marker sequence (`'\u200B\u200C'`)
-- `zws.END_MARKER` - End marker sequence (`'\u200C\u200B'`)
-- `zws.ZERO_BIT` - Zero bit character (`'\u200B'`)
-- `zws.ONE_BIT` - One bit character (`'\u200C'`)
-- `zws.MAX_DATA_LENGTH` - Maximum data length (100)
-- `zws.MAX_ENCODED_LENGTH` - Maximum encoded length (800)
+| Constant | Value |
+|---|---|
+| `zws.START_MARKER` | `'\u200B\u200C'` |
+| `zws.END_MARKER` | `'\u200C\u200B'` |
+| `zws.ZERO_BIT` | `'\u200B'` |
+| `zws.ONE_BIT` | `'\u200C'` |
+| `zws.MAX_DATA_LENGTH` | `100` |
+| `zws.MAX_ENCODED_LENGTH` | `1600` |
 
-## Security Features
+## Migration from 1.x
 
-This library includes security hardening:
+Version 2 cleans up the public contract. Callers upgrading from 1.x should expect the following changes:
 
-### Input Validation
-- **Character restrictions**: Only Basic Multilingual Plane (BMP) characters allowed for embedded data
-- **Length limits**: Embedded data limited to 100 characters to prevent memory exhaustion
-- **Unicode safety**: Blocks emojis, surrogate pairs, and complex Unicode in embedded data
-- **Display text**: No restrictions on the display text - any Unicode characters are supported
-
-### Attack Prevention
-- **Bounds checking**: Prevents buffer overflow and memory exhaustion attacks
-- **Sanitization**: Filters invalid characters from encoded data during decoding
-- **Injection protection**: Input validation helps prevent code injection through embedded data
-
-### Tested Edge Cases
-The test suite verifies handling of:
-
-- **Multilingual text**: Arabic, Hebrew, Thai, Chinese, Japanese, Korean, etc.
-- **Special characters**: Mathematical symbols, scientific notation, musical notation
-- **Complex punctuation**: Typographic symbols, currency signs, diacritical marks
-- **Corrupted data**: Partial markers, mixed valid/invalid characters
-- **Empty data**: Proper handling of empty embedded data
-- **Large inputs**: Memory protection against massive strings
-- **Unicode edge cases**: RTL marks, zero-width joiners, combining characters
-
-### Security Test Coverage
-- **Input validation** - Rejects dangerous characters and oversized data
-- **Memory protection** - Bounds checking prevents DoS attacks  
-- **Data integrity** - Handles corrupted and malformed embedded data
-- **Unicode safety** - Multilingual character support
-- **Edge case handling** - Robust behavior with unusual inputs
+- **`embed` throws on errors.** Previously, oversized data, astral characters, or already-embedded input produced a `console.warn` and returned the original text. The library now throws `Error`. Wrap calls in `try`/`catch`, or pre-validate with `hasEmbeddedData` and length checks.
+- **`embed`'s default insertion point is `'end'`.** Previous versions inserted after the first sentence terminator. To preserve that behaviour, pass `{ position: 'after-first-sentence' }`.
+- **`extract` throws when an embedded payload exceeds `MAX_ENCODED_LENGTH`.** Previously this returned `''` with a warning. Returning `''` is now reserved for the genuinely-no-data case.
+- **No input coercion.** Passing non-strings to any function now throws `TypeError`. The TypeScript signatures required `string` already; this aligns runtime with types.
+- **New `extractAll` method.** Use this when a single `text` may carry several embedded payloads.
 
 ## Limitations
 
-- **Embedded data size**: Maximum 100 characters per embedded data
-- **Embedded data character set**: Limited to Unicode Basic Multilingual Plane (no emojis)
-- **Visibility**: While invisible to users, data can be detected programmatically
-- **Browser support**: Requires modern browsers with Unicode support
+- Embedded data is capped at 100 characters and must lie within the Basic Multilingual Plane (no astral code points, no emoji).
+- Embedded data is invisible but trivially detectable: this is steganography, not encryption.
+- Concatenating two embeds whose visible portions are both empty (`embed('', x) + embed('', y)`) produces a sequence the extractor can decode but the boundary between payloads is lost. Insert any non-zero-width character between such embeds, or supply non-empty visible text.
 
 ## License
 

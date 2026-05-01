@@ -48,15 +48,14 @@ test('handles whitespace-only text with embedded data', () => {
 })
 
 test('removes multiple embedded data blocks while preserving legitimate chars', () => {
-  let text: string = STRINGS.WITH_RTL
-  text = zws.embed(text, 'data1')
-  text = text + STRINGS.WITH_ZWJ
-  text = zws.embed(text, 'data2')
+  const part1 = zws.embed(STRINGS.WITH_RTL, 'data1')
+  const part2 = zws.embed('separator', 'data2')
+  const text = part1 + STRINGS.WITH_ZWJ + part2
 
   const cleaned = zws.getCleanText(text)
   expect(cleaned).toContain('\u200F')
   expect(cleaned).toContain('\u200D')
-  expect(cleaned).not.toMatch(/\u200B\u200C.*\u200C\u200B/)
+  expect(cleaned).not.toMatch(/\u200B\u200C.*?\u200C\u200B/)
 })
 
 test('handles text with partial marker sequences mixed with legitimate chars', () => {

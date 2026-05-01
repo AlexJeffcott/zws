@@ -13,8 +13,8 @@ test('returns original text when no embedded data', () => {
 
 test('removes multiple embedded data blocks', () => {
   const text1 = zws.embed('First', 'data1')
-  const text2 = zws.embed(text1 + ' Second', 'data2')
-  expect(zws.getCleanText(text2)).toBe('First Second')
+  const text2 = zws.embed('Second', 'data2')
+  expect(zws.getCleanText(text1 + ' ' + text2)).toBe('First Second')
 })
 
 test('handles empty string', () => {

@@ -15,8 +15,8 @@ test('encodeData throws on raw surrogate pairs', () => {
   expect(() => zws.encodeData(surrogate)).toThrow('Invalid character in data')
 })
 
-test('embed swallows encodeData errors and returns original text unchanged', () => {
+test('embed propagates encodeData errors instead of swallowing them', () => {
   const text = 'Standard medical procedure'
   const oversized = 'A'.repeat(zws.MAX_DATA_LENGTH + 1)
-  expect(zws.embed(text, oversized)).toBe(text)
+  expect(() => zws.embed(text, oversized)).toThrow('Data too long')
 })

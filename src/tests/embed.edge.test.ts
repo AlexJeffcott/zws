@@ -59,8 +59,9 @@ test('embeds data in whitespace-only text', () => {
   expect(result).toContain(STRINGS.ONLY_WHITESPACE)
 })
 
-test('does not re-embed when text already contains our marker sequence', () => {
+test('throws when re-embedding text that already contains our marker sequence', () => {
   const textWithOurData = zws.embed('Hello world', 'original')
-  const attemptReEmbed = zws.embed(textWithOurData, 'new')
-  expect(attemptReEmbed).toBe(textWithOurData)
+  expect(() => zws.embed(textWithOurData, 'new')).toThrow(
+    'already contains embedded data',
+  )
 })

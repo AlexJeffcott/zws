@@ -1,11 +1,10 @@
 /**
  * Zero-Width Steganography Utils
- * Invisible data embedding using zero-width Unicode characters
+ * Invisible data embedding using zero-width Unicode characters.
  *
- * This module provides functionality to embed arbitrary string data directly into
- * text using zero-width Unicode characters, making them completely invisible to users
- * while allowing programmatic extraction of the embedded data.
- *
+ * Embed arbitrary BMP-range string data into visible text using zero-width
+ * Unicode characters. The embedded data is invisible to humans but trivially
+ * recoverable programmatically.
  */
 
 const START_MARKER = '\u200B\u200C'
@@ -15,69 +14,64 @@ const ONE_BIT = '\u200C'
 const MAX_DATA_LENGTH = 100
 const MAX_ENCODED_LENGTH = MAX_DATA_LENGTH * 16
 
+export type EmbedPosition = 'end' | 'after-first-sentence'
+
+export type EmbedOptions = {
+  position?: EmbedPosition
+}
+
 function hasEmbeddedData(text: string): boolean {
-  if (typeof text !== 'string') return false
   return text.includes(START_MARKER)
 }
 
-function embed(text: string, data: string): string {
-  const normalizedText = typeof text !== 'string' ? String(text || '') : text
-  const normalizedData = typeof data !== 'string' ? String(data || '') : data
-
-  if (hasEmbeddedData(normalizedText)) {
-    return normalizedText
+function embed(text: string, data: string, options: EmbedOptions = {}): string {
+  if (hasEmbeddedData(text)) {
+    throw new Error('Cannot embed: text already contains embedded data')
   }
 
-  try {
-    const encodedData = encodeData(normalizedData)
-    const marker = START_MARKER + encodedData + END_MARKER
+  const encoded = encodeData(data)
+  const marker = START_MARKER + encoded + END_MARKER
 
-    // NOTE: inserts after first sentence if possible
-    const sentenceEnd = normalizedText.search(/[.!?]\s/)
+  if (options.position === 'after-first-sentence') {
+    const sentenceEnd = text.search(/[.!?]\s/)
     if (sentenceEnd !== -1) {
       const insertPos = sentenceEnd + 1
-      return (
-        normalizedText.substring(0, insertPos) +
-        marker +
-        normalizedText.substring(insertPos)
-      )
+      return text.substring(0, insertPos) + marker + text.substring(insertPos)
     }
-
-    return normalizedText + marker
-  } catch (error) {
-    console.warn(
-      'Failed to embed data:',
-      error instanceof Error ? error.message : String(error),
-    )
-    return normalizedText
   }
+
+  return text + marker
 }
 
 function extract(text: string): string {
-  if (typeof text !== 'string') return ''
-  if (!hasEmbeddedData(text)) {
-    return ''
+  if (!hasEmbeddedData(text)) return ''
+
+  const pattern = new RegExp(
+    `${START_MARKER}([${ZERO_BIT}${ONE_BIT}]*)${END_MARKER}`,
+  )
+  const match = text.match(pattern)
+  if (!match) return ''
+
+  return decodeData(match[1] || '')
+}
+
+function extractAll(text: string): string[] {
+  if (!hasEmbeddedData(text)) return []
+
+  const pattern = new RegExp(
+    `${START_MARKER}([${ZERO_BIT}${ONE_BIT}]*)${END_MARKER}`,
+    'g',
+  )
+  const out: string[] = []
+  let match: RegExpExecArray | null = pattern.exec(text)
+  while (match !== null) {
+    out.push(decodeData(match[1] || ''))
+    match = pattern.exec(text)
   }
-
-  try {
-    const pattern = new RegExp(
-      `${START_MARKER}([${ZERO_BIT}${ONE_BIT}]*)${END_MARKER}`,
-    )
-    const match = text.match(pattern)
-
-    if (!match) {
-      return ''
-    }
-
-    return decodeData(match[1] || '')
-  } catch (error) {
-    console.warn('Data extraction failed:', error)
-    return ''
-  }
+  return out
 }
 
 function getCleanText(text: string): string {
-  if (typeof text !== 'string') return String(text || '')
   return text.replace(
     new RegExp(`${START_MARKER}[${ZERO_BIT}${ONE_BIT}]*${END_MARKER}`, 'g'),
     '',
@@ -99,12 +93,11 @@ function encodeData(data: string): string {
     const codePoint = data.codePointAt(i) || 0
     if (codePoint > 65535) {
       throw new Error(
-        `Invalid character in data: "${data[i]}" (U+${codePoint.toString(16).toUpperCase()}). Data must use UTF-8 safe characters only.`,
+        `Invalid character in data: "${data[i]}" (U+${codePoint.toString(16).toUpperCase()}). Data must lie within the Basic Multilingual Plane.`,
       )
     }
   }
 
-  // Encode each character as 16-bit value
   const binary = Array.from(data)
     .map((char) => char.charCodeAt(0).toString(2).padStart(16, '0'))
     .join('')
@@ -116,14 +109,12 @@ function encodeData(data: string): string {
 }
 
 function decodeData(encodedBinary: string): string {
-  // Bounds checking: Prevent memory exhaustion through massive encoded data
   if (encodedBinary.length > MAX_ENCODED_LENGTH) {
     throw new Error(
       `Encoded data too long: ${encodedBinary.length} characters. Maximum allowed: ${MAX_ENCODED_LENGTH} characters.`,
     )
   }
 
-  // Filter out invalid characters that might be mixed in
   const cleanBinary = encodedBinary
     .split('')
     .filter((char) => char === ZERO_BIT || char === ONE_BIT)
@@ -135,7 +126,6 @@ function decodeData(encodedBinary: string): string {
     const charBinary = cleanBinary.substring(i, i + 16)
     if (charBinary.length === 16) {
       const codePoint = Number.parseInt(charBinary, 2)
-      // Use fromCharCode since we're limiting to BMP (16-bit values)
       chars.push(String.fromCharCode(codePoint))
     }
   }
@@ -153,6 +143,7 @@ const zws = {
   hasEmbeddedData,
   embed,
   extract,
+  extractAll,
   getCleanText,
   encodeData,
   decodeData,

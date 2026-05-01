@@ -29,19 +29,10 @@ test('returns empty string for empty string', () => {
   expect(zws.extract('')).toBe('')
 })
 
-test('handles decoding errors gracefully', () => {
-  // Create a spy to temporarily mock console.warn to avoid noise in test output
-  const originalWarn = console.warn
-  const mockWarn = () => {}
-  console.warn = mockWarn
-
-  // Create text with valid markers but corrupted encoded data that would cause decodeData to fail
-  // This uses an extremely long encoded sequence that exceeds MAX_ENCODED_LENGTH in decodeData
-  const longEncodedData = '\u200B'.repeat(1601) // Exceeds 100 * 16 = 1600 character limit
+test('throws when embedded payload exceeds MAX_ENCODED_LENGTH', () => {
+  // Valid markers with an encoded body too long to decode (1601 > 100 * 16 = 1600)
+  const longEncodedData = '\u200B'.repeat(1601)
   const corruptedText = `Hello\u200B\u200C${longEncodedData}\u200C\u200B world`
 
-  expect(zws.extract(corruptedText)).toBe('')
-
-  // Restore original console.warn
-  console.warn = originalWarn
+  expect(() => zws.extract(corruptedText)).toThrow('Encoded data too long')
 })
