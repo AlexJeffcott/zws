@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "bun",
+  "plugins": ["stryker-mutator-bun-runner"],
+  "bun": {
+    "testFiles": ["src/**/*.test.ts"],
+    "timeout": 30000
+  },
+  "coverageAnalysis": "off",
+  "disableBail": true,
+  "checkers": [],
+  "reporters": ["json", "clear-text", "progress", "html"],
+  "mutate": ["src/index.ts"],
+  "thresholds": {
+    "high": 90,
+    "low": 70,
+    "break": null
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.git/**",
+    "**/.stryker-tmp/**",
+    "**/reports/**"
+  ],
+  "timeoutMS": 20000,
+  "concurrency": 4
+}

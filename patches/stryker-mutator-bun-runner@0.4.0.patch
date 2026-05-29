@@ -1,0 +1,142 @@
+diff --git a/dist/BunTestAdapter.js b/dist/BunTestAdapter.js
+index b2f145efd9fa834e4ddbc2d071f6d056df475bc7..05eb5c167b6b5199d20cccb9dc85986bac192cac 100644
+--- a/dist/BunTestAdapter.js
++++ b/dist/BunTestAdapter.js
+@@ -1,8 +1,22 @@
+ import { execa } from 'execa';
+ import { glob } from 'glob';
++import { readFile, unlink } from 'node:fs/promises';
++import * as os from 'node:os';
++import * as nodePath from 'node:path';
+ import { BunResultParser } from './BunResultParser.js';
+ import { MutantCoverageCollector, CoverageHookGenerator } from "./coverage/index.js";
+ import { ProcessPoolSingleton } from './process/ProcessPoolSingleton.js';
++// --- DEAD-TESTS PATCH: junit-based result parsing (bun 1.3.x emits no per-test console lines when piped) ---
++let __junitCounter = 0;
++function __getAttr(attrs, key) {
++    const m = new RegExp(`${key}="([^"]*)"`).exec(attrs || '');
++    return m ? m[1] : '';
++}
++function __decodeEntities(s) {
++    return (s || '')
++        .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#39;/g, "'")
++        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
++}
+ class TimeoutError extends Error {
+     timedOut = true;
+     constructor(message) {
+@@ -68,6 +82,7 @@ export class BunTestAdapter {
+      * @throws Error if test execution fails or times out
+      */
+     async runTests(testFiles, runOptions) {
++        this.junitPath = nodePath.join(os.tmpdir(), `stryker-bun-junit-${process.pid}-${++__junitCounter}.xml`);
+         const args = await this.buildBunArgs(testFiles, runOptions);
+         const env = this.buildEnvironment(runOptions);
+         const coverageTracker = this.initializeCoverage(runOptions);
+@@ -144,8 +159,64 @@ export class BunTestAdapter {
+         }
+     }
+     async parseResults(execResult) {
+-        const outputToParse = execResult.stderr || execResult.stdout;
+-        return this.parser.parse(outputToParse);
++        let xml;
++        try {
++            xml = await readFile(this.junitPath, 'utf-8');
++        }
++        catch (e) {
++            this.log.warn(`Could not read JUnit report at ${this.junitPath}: ${e}. Falling back to console parse.`);
++            const outputToParse = execResult.stderr || execResult.stdout;
++            return this.parser.parse(outputToParse);
++        }
++        try {
++            await unlink(this.junitPath);
++        }
++        catch { /* ignore */ }
++        return this.parseJUnit(xml);
++    }
++    parseJUnit(xml) {
++        const tests = [];
++        let passed = 0, failed = 0, skipped = 0;
++        const caseRe = /<testcase\b([^>]*?)(\/>|>([\s\S]*?)<\/testcase>)/g;
++        let m;
++        while ((m = caseRe.exec(xml)) !== null) {
++            const attrs = m[1];
++            const inner = m[3] || '';
++            const name = __decodeEntities(__getAttr(attrs, 'name'));
++            const file = __decodeEntities(__getAttr(attrs, 'file'));
++            const lineNo = __getAttr(attrs, 'line');
++            const time = parseFloat(__getAttr(attrs, 'time') || '0');
++            const id = file ? `${file}::${name}` : name;
++            let status = 'passed';
++            let error;
++            if (/<failure\b/.test(inner) || /<error\b/.test(inner)) {
++                status = 'failed';
++                const fm = /<(?:failure|error)\b([^>]*)>/.exec(inner);
++                error = fm ? __decodeEntities(__getAttr(fm[1], 'message') || '') || 'Test failed' : 'Test failed';
++            }
++            else if (/<skipped\b/.test(inner)) {
++                status = 'skipped';
++            }
++            const t = { id, name, file, line: lineNo ? parseInt(lineNo, 10) : undefined, status, duration: time * 1000 };
++            if (error)
++                t.error = error;
++            tests.push(t);
++            if (status === 'passed')
++                passed++;
++            else if (status === 'failed')
++                failed++;
++            else
++                skipped++;
++        }
++        this.log.debug(`Parsed JUnit: ${tests.length} tests (${passed} passed, ${failed} failed, ${skipped} skipped)`);
++        return {
++            tests,
++            passed,
++            failed,
++            total: tests.length,
++            duration: undefined,
++            failedTests: tests.filter(t => t.status === 'failed')
++        };
+     }
+     attachCoverageResults(result, coverageTracker) {
+         if (coverageTracker.enabled) {
+@@ -211,9 +282,15 @@ export class BunTestAdapter {
+         this.addCoverageArgs(args, options);
+         this.addTestOptions(args, options);
+         this.addNodeArgs(args);
++        this.addJUnitReporter(args);
+         await this.addTestFiles(args, testFiles);
+         return args;
+     }
++    addJUnitReporter(args) {
++        if (this.options.command)
++            return;
++        args.push('--reporter=junit', `--reporter-outfile=${this.junitPath}`);
++    }
+     addBaseCommand(args) {
+         if (this.options.command) {
+             const commandParts = this.options.command.split(' ');
+diff --git a/dist/BunTestRunner.js b/dist/BunTestRunner.js
+index 8c21e725f250fe84347a35e36ffecb4f3bc3d6bf..303cb3fda7fc19ba49cab498fdcf08033ee17f53 100644
+--- a/dist/BunTestRunner.js
++++ b/dist/BunTestRunner.js
+@@ -129,7 +129,9 @@ export class BunTestRunner {
+             const baseProps = {
+                 id: test.id || index.toString(),
+                 name: test.name,
+-                timeSpentMs: test.duration || 0
++                timeSpentMs: test.duration || 0,
++                ...(test.file ? { fileName: test.file } : {}),
++                ...(test.line ? { startPosition: { line: Math.max(0, test.line - 1), column: 0 } } : {})
+             };
+             switch (test.status) {
+                 case 'passed':
+@@ -170,7 +172,7 @@ export class BunTestRunner {
+     createMutantRunOptions(options) {
+         return {
+             timeout: options.timeout,
+-            bail: true,
++            bail: false,
+             activeMutant: parseInt(options.activeMutant.id, 10),
+             env: { __STRYKER_ACTIVE_MUTANT__: options.activeMutant.id.toString() }
+         };

@@ -1,0 +1,94 @@
+# test-debt
+
+Finds **dead weight in the test suite** — the inverse of mutation testing.
+Where Stryker tells you what code no test pins (surviving mutants), this reads
+the same kill matrix the other way and tells you which tests pin nothing the
+rest of the suite doesn't already pin.
+
+The motivating observation: above ~90% mutation score the score stops being
+informative (everyone's saturated) and the interesting number becomes *how
+much suite you spend to hold it*. On zws today that's a 7.6× case-level
+redundancy ratio — 106 killing tests doing the work of ~14.
+
+## Signals
+
+| signal | meaning | data needed |
+|---|---|---|
+| **gaps** | survived mutants — code no test pins | status |
+| **redundancy** | tests/files whose every kill is caught elsewhere too | `killedBy` matrix |
+| **theatre** | covered-but-survived — assertions ran the code but caught nothing | `coveredBy` *(deferred)* |
+
+Redundancy is reported at both **file** and **case** level. Decisions should be
+keyed at file level — file identity is stable across `describe` restructuring,
+git tracks renames — with the case list as drill-down.
+
+## Usage
+
+```sh
+bun run mutation             # produce reports/mutation/mutation.json
+bun run test-debt            # print the signals report
+bun run test-debt:decisions  # join signals against the committed decisions log
+bun run test-debt:verify     # run a fresh pass + assert the matrix contract
+```
+
+### Decisions log
+
+Signals are derived and regenerable; **decisions** about them are not, and live
+in `decisions.jsonl` (committed, mergeable, append-only, last-write-wins per
+file). Record one with:
+
+```sh
+bun scripts/test-debt/decisions.ts decide <test-file> <keep|prune|rewrite|investigate> "<rationale>"
+```
+
+`decisions.ts` (default `status`) joins the fresh matrix against the log and
+buckets every file into **needs-review** (subsumed, no decision yet), **stale**
+(the decision's basis drifted), or **settled** (decision still holds — kept off
+the action list). Each decision stores a normalised content hash of the test
+file *and* its subsumption snapshot at decision time; a verdict goes stale when
+the file changes (real edits only — comments/formatting are normalised out) or
+when the matrix around it shifts (e.g. a test elsewhere is deleted, making this
+file's kills newly unique). That's what stops a `keep` from outliving its
+reason.
+
+The SQLite db (`reports/test-debt.sqlite`) is a **regenerable build artefact**
+— gitignored. The tool consumes the mutation-testing-report **schema**, never a
+specific runner, so the analysis is portable to any matrix-producing runner.
+
+## How the matrix is produced (the fragile part)
+
+Bun has no Stryker plugin and the `command` runner can't report per-test
+results, so there's no kill matrix by default. We use the community
+`stryker-mutator-bun-runner`, **pinned to 0.4.0 and patched** (`bun patch`,
+diff committed under `patches/`). Plugin 0.4.0 predates Bun 1.3.x and was
+broken against it; the patch:
+
+1. **Emits + parses JUnit XML** (`--reporter=junit --reporter-outfile`). Bun
+   1.3.x prints no per-test console lines when piped and has no TAP reporter,
+   so the plugin's console-scraping parser found zero tests. JUnit is the only
+   machine-readable per-test source Bun exposes.
+2. **Carries `fileName`/`startPosition`** into each test result, so the report
+   is keyed by real test-file paths instead of one `""` bucket — file-level
+   identity.
+3. **Disables the per-mutant bail** so `killedBy` lists *every* killing test,
+   not just the first — without this the redundancy signal is dead.
+
+This rests on a pinned pair: **(Bun version, plugin+patch)**. A Bun upgrade or a
+patch that stops applying can silently collapse the matrix. `verify-matrix.ts`
+is the guard — run it after any bump.
+
+`coverageAnalysis` is `"off"`: the plugin's coverage hook wraps a global
+`test`/`it` that import-style Bun tests bypass, and there's no IPC to ferry
+coverage out of the Bun child, so `coveredBy` isn't obtainable. We run the full
+suite per mutant instead (fine at zws scale; it yields the *complete* matrix).
+**Theatre detection is deferred** until per-test coverage extraction is fixed.
+
+## Caveats — the matrix nominates, a human convicts
+
+- **Redundant ≠ useless.** Mutation operators only model the faults they model.
+  A test subsumed against today's mutants can still be the only guard against a
+  fault class the operators never generate, or valuable as documentation.
+- **Don't minimise to 1.** A minimal cover leaves every mutant killed by exactly
+  one test — no defence-in-depth. Prune toward an N-cover (every mutant killed
+  ≥ N times), not the greedy minimum the ratio reports.
+- The greedy "~N prunable" is an upper bound on surplus, not a delete list.

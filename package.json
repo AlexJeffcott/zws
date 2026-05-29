@@ -23,6 +23,10 @@
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist --skipLibCheck --target es2020 --module esnext --moduleResolution bundler src/index.ts",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
+    "mutation": "stryker run",
+    "test-debt": "bun scripts/test-debt/report.ts",
+    "test-debt:decisions": "bun scripts/test-debt/decisions.ts",
+    "test-debt:verify": "bun scripts/test-debt/verify-matrix.ts --run",
     "lint": "biome lint src",
     "lint:fix": "biome lint src --write",
     "fmt:fix": "biome format src --write",
@@ -59,9 +63,14 @@
   "homepage": "https://github.com/alexjeffcott/zws#readme",
   "devDependencies": {
     "@biomejs/biome": "^1.8.0",
-    "@types/bun": "^1.2.19"
+    "@stryker-mutator/core": "^9.6.1",
+    "@types/bun": "^1.2.19",
+    "stryker-mutator-bun-runner": "0.4.0"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "patchedDependencies": {
+    "stryker-mutator-bun-runner@0.4.0": "patches/stryker-mutator-bun-runner@0.4.0.patch"
   }
 }
