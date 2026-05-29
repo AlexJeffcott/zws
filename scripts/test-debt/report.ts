@@ -3,8 +3,8 @@
  *
  *   gaps        survived mutants — code no test pins (the Stryker direction)
  *   redundancy  tests/files whose every kill is also caught elsewhere
- *   theatre     covered-but-survived (needs coveredBy; deferred until the
- *               runner reports coverage — printed only if the data is present)
+ *   theatre     covered-but-survived — code a test runs but no test detects
+ *               (the Survived status under coverageAnalysis "all")
  *
  * Redundancy is reported at BOTH file and case level. Decisions are keyed at
  * file level (stable identity); case level is the drill-down.
@@ -102,24 +102,25 @@ export function report(db: Database): string {
 		for (const r of rows) p(`      “${r.name}” (${r.total} kills, 0 unique)`);
 	}
 
-	// --- gaps ---
-	const gaps = db.query("SELECT mutator, line, count(*) n FROM mutants WHERE status='Survived' GROUP BY mutator, line ORDER BY line").all() as Row[];
-	p(`\nGAPS  (survived mutants — ${gaps.reduce((a, r) => a + (r.n as number), 0)} total)`);
-	const gapFile = (db.query("SELECT file FROM mutants WHERE status='Survived' LIMIT 1").get() as Row | null)?.file;
-	for (const r of gaps) p(`  ${gapFile}:${r.line}  ${r.mutator}${(r.n as number) > 1 ? ` ×${r.n}` : ""}`);
+	// Under coverageAnalysis "all", Stryker classifies a non-killed mutant as
+	// NoCoverage (no test runs it — a true gap) or Survived (a test runs it but
+	// nothing detects the mutation — theatre). That status split IS the
+	// gap/theatre distinction; it requires coverage to be on (see README).
+	const srcFile = (db.query("SELECT file FROM mutants LIMIT 1").get() as Row | null)?.file;
 
-	// --- theatre (only if coverage present) ---
-	const nCov = (db.query("SELECT count(*) n FROM covers").get() as Row).n as number;
-	if (nCov > 0) {
-		const theatre = db.query(`
-			SELECT m.line, m.mutator FROM mutants m
-			WHERE m.status='Survived' AND EXISTS (SELECT 1 FROM covers c WHERE c.mutant_id=m.id)
-			ORDER BY m.line`).all() as Row[];
-		p(`\nTHEATRE  (covered but survived — assertions ran the code but caught nothing: ${theatre.length})`);
-		for (const r of theatre) p(`  ${gapFile}:${r.line}  ${r.mutator}`);
-	} else {
-		p(`\nTHEATRE  unavailable — runner reported no coveredBy data (deferred: needs per-test coverage extraction)`);
-	}
+	// --- gaps: code no test even executes ---
+	const gaps = db.query("SELECT line, mutator, count(*) n FROM mutants WHERE status='NoCoverage' GROUP BY line, mutator ORDER BY line").all() as Row[];
+	const gapTotal = gaps.reduce((a, r) => a + (r.n as number), 0);
+	p(`\nGAPS  (NoCoverage — no test executes this code: ${gapTotal})`);
+	if (gapTotal === 0) p(`  none — every mutable location is reached by some test`);
+	for (const r of gaps) p(`  ${srcFile}:${r.line}  ${r.mutator}${(r.n as number) > 1 ? ` ×${r.n}` : ""}`);
+
+	// --- theatre: covered but survived ---
+	const theatre = db.query("SELECT line, mutator, count(*) n FROM mutants WHERE status='Survived' GROUP BY line, mutator ORDER BY line").all() as Row[];
+	const theatreTotal = theatre.reduce((a, r) => a + (r.n as number), 0);
+	p(`\nTHEATRE  (Survived — code is covered but no test detects the mutation: ${theatreTotal})`);
+	if (theatreTotal === 0) p(`  none`);
+	for (const r of theatre) p(`  ${srcFile}:${r.line}  ${r.mutator}${(r.n as number) > 1 ? ` ×${r.n}` : ""}`);
 
 	return out.join("\n");
 }

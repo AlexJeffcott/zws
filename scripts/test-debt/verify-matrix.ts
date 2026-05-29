@@ -63,6 +63,11 @@ add(
 	`${multi.length} mutant(s) killed by >1 test — collapses to 0 if bail re-engages`,
 );
 
+// 5. coverage extraction works: if the afterAll dump fails, the coverage map is
+//    empty and Stryker marks EVERY mutant NoCoverage (theatre/gap split dies).
+const noCov = mutants.filter((m) => m.status === "NoCoverage").length;
+add("coverage collected (not all NoCoverage)", noCov < mutants.length, `${noCov}/${mutants.length} NoCoverage — all-NoCoverage means the coverage dump broke`);
+
 // report
 let allOk = true;
 console.log("\nKill-matrix contract:");

@@ -7,7 +7,7 @@
     "testFiles": ["src/**/*.test.ts"],
     "timeout": 30000
   },
-  "coverageAnalysis": "off",
+  "coverageAnalysis": "all",
   "disableBail": true,
   "checkers": [],
   "reporters": ["json", "clear-text", "progress", "html"],

@@ -16,7 +16,7 @@ redundancy ratio — 106 killing tests doing the work of ~14.
 |---|---|---|
 | **gaps** | survived mutants — code no test pins | status |
 | **redundancy** | tests/files whose every kill is caught elsewhere too | `killedBy` matrix |
-| **theatre** | covered-but-survived — assertions ran the code but caught nothing | `coveredBy` *(deferred)* |
+| **theatre** | covered-but-survived — assertions ran the code but caught nothing | coverage `"all"` |
 
 Redundancy is reported at both **file** and **case** level. Decisions should be
 keyed at file level — file identity is stable across `describe` restructuring,
@@ -72,16 +72,25 @@ broken against it; the patch:
    identity.
 3. **Disables the per-mutant bail** so `killedBy` lists *every* killing test,
    not just the first — without this the redundancy signal is dead.
+4. **Extracts coverage from the Bun child.** The plugin's collector read
+   `__stryker__` in the *runner* process, where it's always empty — the
+   instrumented code runs in the Bun child. The patch dumps
+   `__stryker__.mutantCoverage` from a global `afterAll` (Bun's `bun test`
+   doesn't fire `process` exit events in preloads) and the adapter reads it
+   back. That makes coverage `"all"` work, which is what splits gaps (NoCoverage)
+   from theatre (Survived).
 
 This rests on a pinned pair: **(Bun version, plugin+patch)**. A Bun upgrade or a
 patch that stops applying can silently collapse the matrix. `verify-matrix.ts`
 is the guard — run it after any bump.
 
-`coverageAnalysis` is `"off"`: the plugin's coverage hook wraps a global
-`test`/`it` that import-style Bun tests bypass, and there's no IPC to ferry
-coverage out of the Bun child, so `coveredBy` isn't obtainable. We run the full
-suite per mutant instead (fine at zws scale; it yields the *complete* matrix).
-**Theatre detection is deferred** until per-test coverage extraction is fixed.
+`coverageAnalysis` is `"all"`: Stryker then runs only covered mutants, marking
+the rest **NoCoverage** (true gaps) and leaving covered-but-undetected ones
+**Survived** (theatre). That status split *is* the gap/theatre distinction —
+flip coverage to `"off"` and it's lost (everything non-killed shows as
+Survived). Per-mutant `coveredBy` (which *specific* tests cover a theatre mutant
+— the rewrite target) still needs per-test coverage and is not yet wired; the
+file/suite-level theatre signal works today.
 
 ## Caveats — the matrix nominates, a human convicts
 
